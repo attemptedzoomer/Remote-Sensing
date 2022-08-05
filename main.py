@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
-from scene import *
+from scene import generate_scene
+import numpy as np
 
 plt.style.use('dark_background')
 
