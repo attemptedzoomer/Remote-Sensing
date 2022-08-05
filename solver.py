@@ -1,6 +1,7 @@
 import numpy as np
 import time
 import math
+from numba import njit
 
 """
 IF U1 IS PROVIDED: For solving a wave given two input waves with a time step between them
@@ -13,9 +14,7 @@ Momentum and energy are conserved
 def solve(t_bound, dx, dt, c):
     # Initialize array and special numbers for calculations
     length = c.size
-    u0 = np.zeros(length, np.double)
-    u1 = np.zeros(length, np.double)
-    u2 = np.zeros(length, np.double)
+    u0 = np.zeros(length, np.float32)
     desired_frames = 500
     a = []
     nx = length - 1
@@ -23,10 +22,7 @@ def solve(t_bound, dx, dt, c):
     C2 = (dt * dt) / (dx * dx)
 
     # Calculate u1
-    for i in range(1, nx - 1):
-        u1[i] = u0[i] + 0.5 * C2 * (u0[i + 1] * (c[i + 1] ** 2)
-                                    - 2 * u0[i] * (c[i] ** 2)
-                                    + u0[i - 1] * (c[i - 1] ** 2))
+    u1 = initialize_u1(u0, nx, C2, c)
 
     # Calculate u2 and generate a
     t0 = time.time()
@@ -34,12 +30,7 @@ def solve(t_bound, dx, dt, c):
     for n in range(1, nt + 1):
         # Update mesh points for all points in u2
         # Assumes ideally reflecting bounds
-        for i in range(0, nx + 1):
-            ip1 = i + 1 if i < nx else i - 1
-            im1 = i - 1 if i > 0 else i + 1
-            u2[i] = 2 * u1[i] - u0[i] + C2 * (u1[ip1] * (c[ip1] ** 2)
-                                              - 2 * u1[i] * (c[i] ** 2)
-                                              + u1[im1] * (c[im1] ** 2))
+        u2 = update_inner_mesh_points(u0, u1, nx, C2, c)
 
         # Send out wave
         if n < 1000:
@@ -66,3 +57,23 @@ def solve(t_bound, dx, dt, c):
     print("Real time taken:", round(time.time() - t0, 2), "seconds")
 
     return a
+
+@njit
+def initialize_u1(u0, nx, C2, c):
+    u1 = np.zeros(u0.size, np.float32)
+    for i in range(1, nx - 1):
+        u1[i] = u0[i] + 0.5 * C2 * (u0[i + 1] * (c[i + 1] ** 2)
+                                    - 2 * u0[i] * (c[i] ** 2)
+                                    + u0[i - 1] * (c[i - 1] ** 2))
+    return u1
+
+@njit
+def update_inner_mesh_points(u0, u1, nx, C2, c):
+    u2 = np.zeros(u0.size, np.float32)
+    for i in range(0, nx + 1):
+        ip1 = i + 1 if i < nx else i - 1
+        im1 = i - 1 if i > 0 else i + 1
+        u2[i] = 2 * u1[i] - u0[i] + C2 * (u1[ip1] * (c[ip1] ** 2)
+                                          - 2 * u1[i] * (c[i] ** 2)
+                                          + u1[im1] * (c[im1] ** 2))
+    return u2
