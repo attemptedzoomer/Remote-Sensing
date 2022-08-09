@@ -1,7 +1,7 @@
 import numpy as np
 import time
-import math
 from numba import njit
+from pulse import generate_pulse
 
 """
 IF U1 IS PROVIDED: For solving a wave given two input waves with a time step between them
@@ -12,14 +12,26 @@ Momentum and energy are conserved
 
 
 def solve(t_bound, dx, dt, c):
+    """
+    Creates an array of the numerical solution to the acoustic wave equation in one dimension
+
+    :param t_bound: the end of the time domain (the beginning is assumed to be t = 0)
+    :param dx: the density of the x mesh
+    :param dt: timestep
+    :param c: an array representing the speed of sound of the media
+    :return: a, an array that holds the behavior of the wave
+    """
+
     # Initialize array and special numbers for calculations
     length = c.size
-    u0 = np.zeros(length, np.float32)
     desired_frames = 500
     a = []
     nx = length - 1
     nt = int(t_bound // dt)
     C2 = (dt * dt) / (dx * dx)
+
+    # Calculate u0
+    u0 = generate_pulse(length)
 
     # Calculate u1
     u1 = initialize_u1(u0, nx, C2, c)
@@ -32,16 +44,6 @@ def solve(t_bound, dx, dt, c):
         # Assumes ideally reflecting bounds
         u2 = update_inner_mesh_points(u0, u1, nx, C2, c)
 
-        # Send out wave
-        if n < 1000:
-            u2[500] = math.exp(-(5 * (n / 1000 - 0.5)) ** 2)
-
-        # Calculate time to completion
-        if n == round(nt / 100):
-            print("Estimated time from completion:",
-                  round((time.time() - t0) * 100, 2),
-                  "seconds")
-
         # Update a
         if n % round((nt + 1) / desired_frames) == 0:
             a.append(np.copy(u2))
@@ -49,14 +51,11 @@ def solve(t_bound, dx, dt, c):
         # Change Variables
         u0[:], u1[:] = u1, u2
 
-        # Display progress
-        if n % (round(nt / 10)) == 0:
-            print(round(n / (nt + 1) * 100), "% Done Calculating")
-
     print("Done Calculating")
     print("Real time taken:", round(time.time() - t0, 2), "seconds")
 
     return a
+
 
 @njit
 def initialize_u1(u0, nx, C2, c):
@@ -66,6 +65,7 @@ def initialize_u1(u0, nx, C2, c):
                                     - 2 * u0[i] * (c[i] ** 2)
                                     + u0[i - 1] * (c[i - 1] ** 2))
     return u1
+
 
 @njit
 def update_inner_mesh_points(u0, u1, nx, C2, c):
