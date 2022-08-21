@@ -31,7 +31,7 @@ def solve(t_bound, dx, dt, c):
     C2 = (dt * dt) / (dx * dx)
 
     # Calculate u0
-    u0 = generate_pulse(length)
+    u0 = generate_pulse(length, starting_location='left')
 
     # Calculate u1
     u1 = initialize_u1(u0, nx, C2, c)
